@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鶴見駅 次の電車</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .direction-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .direction {
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .direction.tokyo {
+            background: linear-gradient(135deg, #0084ff 0%, #0063cc 100%);
+        }
+
+        .direction.yokohama {
+            background: linear-gradient(135deg, #00c44f 0%, #009844 100%);
+        }
+
+        .direction-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .train-time {
+            font-size: 60px;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .train-time-unit {
+            font-size: 24px;
+            margin-left: 5px;
+            opacity: 0.8;
+        }
+
+        .next-train-time {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .footer {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .footer p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .update-time {
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        .status-message {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .train-time {
+                font-size: 50px;
+            }
+
+            .direction {
+                min-height: 160px;
+                padding: 15px;
+            }
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .train-time {
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.8;
+                }
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚆 鶴見駅</h1>
+            <p>京浜東北線 次の電車</p>
+        </div>
+
+        <div class="direction-container">
+            <!-- 東京方面 -->
+            <div class="direction tokyo">
+                <div class="direction-name">↑ 東京・大宮方面</div>
+                <div>
+                    <div class="train-time">
+                        <span id="tokyo-min">--</span>
+                        <span class="train-time-unit">分</span>
+                        <span id="tokyo-sec">--</span>
+                        <span class="train-time-unit">秒</span>
+                    </div>
+                    <div class="next-train-time">次発: <span id="tokyo-time">--:--</span></div>
+                    <div class="status-message" id="tokyo-status"></div>
+                </div>
+            </div>
+
+            <!-- 横浜方面 -->
+            <div class="direction yokohama">
+                <div class="direction-name">↓ 横浜・大船方面</div>
+                <div>
+                    <div class="train-time">
+                        <span id="yokohama-min">--</span>
+                        <span class="train-time-unit">分</span>
+                        <span id="yokohama-sec">--</span>
+                        <span class="train-time-unit">秒</span>
+                    </div>
+                    <div class="next-train-time">次発: <span id="yokohama-time">--:--</span></div>
+                    <div class="status-message" id="yokohama-status"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>⏰ <span id="current-time">--:--:--</span></p>
+            <p class="update-time">更新: <span id="update-time">--:--:--</span></p>
+            <p style="margin-top: 10px; color: #999; font-size: 11px;">平日時刻表を使用しています</p>
+        </div>
+    </div>
+
+    <script>
+        // 鶴見駅 京浜東北線 平日時刻表（分単位）
+        const trainSchedule = {
+            tokyo: [ // 東京・大宮方面（上り）
+                3, 11, 22, 29, 35, 41, 49, 52, 57, // 6時
+                1, 7, 12, 16, 18, 23, 26, 31, 34, 36, 40, 43, 46, 49, 52, 55, 59, // 7時
+                2, 6, 8, 12, 15, 18, 21, 25, 27, 31, 35, 38, 41, 44, 47, 50, 56, 59, // 8時
+                2, 7, 10, 15, 18, 23, 27, 32, 36, 42, 47, 51, 55, // 9時
+                1, 7, 12, 17, 26, 32, 37, 47, 52, // 10時
+                5, 15, 24, 29, 35, 44, 49, 55, // 11時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 12時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 13時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 14時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 15時
+                7, 15, 20, 26, 36, 39, 44, 50, 56, // 16時
+                5, 10, 14, 19, 24, 29, 34, 39, 44, 49, 55, // 17時
+                0, 5, 7, 12, 16, 19, 22, 26, 30, 33, 40, 46, 50, 55, // 18時
+                2, 8, 12, 17, 21, 25, 32, 36, 42, 49, 53, 59, // 19時
+                3, 7, 13, 18, 22, 29, 34, 42, 46, 50, 55, // 20時
+                0, 5, 10, 15, 20, 25, 30, 35, 40, 46, 51, 56, // 21時
+                1, 6, 12, 18, 23, 29, 34, 40, 47, 53, 58, // 22時
+                3, 10, 16, 22, 28, 32, 40, 51 // 23時
+            ],
+            yokohama: [ // 横浜・大船方面（下り）
+                5, 9, 14, 19, 23, 29, 36, 42, 45, 51, 56, // 6時
+                1, 9, 14, 17, 21, 26, 30, 36, 40, 44, 49, 54, // 7時
+                0, 7, 14, 20, 23, 26, 30, 37, 41, 47, 50, 58, // 8時
+                4, 8, 12, 16, 20, 24, 29, 36, 42, 45, 52, 57, // 9時
+                4, 10, 15, 18, 25, 29, 34, 38, 45, 54, 59, // 10時
+                5, 15, 24, 29, 35, 44, 49, 55, // 11時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 12時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 13時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 14時
+                4, 9, 15, 24, 29, 35, 44, 49, 55, // 15時
+                7, 15, 20, 26, 36, 39, 44, 50, 56, // 16時
+                5, 10, 14, 19, 24, 29, 34, 39, 44, 49, 55, // 17時
+                0, 5, 7, 12, 16, 19, 22, 26, 30, 33, 40, 46, 50, 55, // 18時
+                2, 8, 12, 17, 21, 25, 32, 36, 42, 49, 53, 59, // 19時
+                3, 7, 13, 18, 22, 29, 34, 42, 46, 50, 55, // 20時
+                0, 5, 10, 15, 20, 25, 30, 35, 40, 46, 51, 56, // 21時
+                1, 6, 12, 18, 23, 29, 34, 40, 47, 53, 58, // 22時
+                4, 11, 17, 24, 29, 35, 41, 47, 53, 59 // 23時
+            ]
+        };
+
+        // 時刻表を時間単位の構造に変換
+        const hoursData = {
+            tokyo: Array.from({ length: 18 }, (_, i) => []), // 6時～23時
+            yokohama: Array.from({ length: 18 }, (_, i) => [])
+        };
+
+        // データを時間ごとに分配
+        let tokyoIndex = 0, yokohamaIndex = 0;
+        const startHour = 6;
+
+        const tokyoPerHour = [9, 17, 18, 13, 9, 8, 9, 9, 9, 9, 9, 11, 14, 12, 11, 12, 11, 8];
+        const yokohamaPerHour = [11, 12, 12, 12, 11, 8, 9, 9, 9, 9, 9, 11, 14, 12, 11, 12, 11, 10];
+
+        for (let h = 0; h < 18; h++) {
+            hoursData.tokyo[h] = trainSchedule.tokyo.slice(tokyoIndex, tokyoIndex + tokyoPerHour[h]);
+            tokyoIndex += tokyoPerHour[h];
+            hoursData.yokohama[h] = trainSchedule.yokohama.slice(yokohamaIndex, yokohamaIndex + yokohamaPerHour[h]);
+            yokohamaIndex += yokohamaPerHour[h];
+        }
+
+        // 次の電車を探す関数
+        function getNextTrain(direction) {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMin = now.getMinutes();
+
+            // 6時～23時の範囲内か確認
+            if (currentHour < 6 || currentHour >= 24) {
+                return { hour: null, min: null, isNextDay: currentHour >= 24 };
+            }
+
+            const hourIndex = currentHour - 6;
+
+            // 現在時刻より後の電車を探す
+            for (let h = hourIndex; h < 18; h++) {
+                const times = hoursData[direction][h];
+                const searchHour = h + 6;
+
+                for (const minValue of times) {
+                    if (searchHour > currentHour || (searchHour === currentHour && minValue > currentMin)) {
+                        return { hour: searchHour, min: minValue, isNextDay: false };
+                    }
+                }
+            }
+
+            // 当日に次の電車がない場合は、翌日6時の電車
+            return { hour: 6, min: hoursData[direction][0][0], isNextDay: true };
+        }
+
+        // 時間差を計算する関数
+        function getTimeUntil(nextTrain) {
+            const now = new Date();
+            let nextTime = new Date();
+
+            if (nextTrain.isNextDay) {
+                nextTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, nextTrain.hour, nextTrain.min, 0);
+            } else {
+                nextTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), nextTrain.hour, nextTrain.min, 0);
+            }
+
+            const diffMs = nextTime - now;
+            const diffSec = Math.floor(diffMs / 1000);
+
+            if (diffSec < 0) {
+                return { min: 0, sec: 0 };
+            }
+
+            const min = Math.floor(diffSec / 60);
+            const sec = diffSec % 60;
+
+            return { min, sec };
+        }
+
+        // UI更新関数
+        function updateDisplay() {
+            const now = new Date();
+
+            // 現在時刻表示
+            const timeString = now.toLocaleTimeString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeString;
+
+            // 東京方面
+            const tokyoNext = getNextTrain('tokyo');
+            const tokyoTime = getTimeUntil(tokyoNext);
+            document.getElementById('tokyo-min').textContent = String(tokyoTime.min).padStart(2, '0');
+            document.getElementById('tokyo-sec').textContent = String(tokyoTime.sec).padStart(2, '0');
+
+            if (tokyoNext.hour !== null) {
+                const timeStr = String(tokyoNext.hour).padStart(2, '0') + ':' + String(tokyoNext.min).padStart(2, '0');
+                document.getElementById('tokyo-time').textContent = timeStr;
+                document.getElementById('tokyo-status').textContent = tokyoNext.isNextDay ? '（翌日）' : '';
+            } else {
+                document.getElementById('tokyo-time').textContent = '運行終了';
+                document.getElementById('tokyo-status').textContent = '翌日6:03まで';
+            }
+
+            // 横浜方面
+            const yokohamaNext = getNextTrain('yokohama');
+            const yokohamaTime = getTimeUntil(yokohamaNext);
+            document.getElementById('yokohama-min').textContent = String(yokohamaTime.min).padStart(2, '0');
+            document.getElementById('yokohama-sec').textContent = String(yokohamaTime.sec).padStart(2, '0');
+
+            if (yokohamaNext.hour !== null) {
+                const timeStr = String(yokohamaNext.hour).padStart(2, '0') + ':' + String(yokohamaNext.min).padStart(2, '0');
+                document.getElementById('yokohama-time').textContent = timeStr;
+                document.getElementById('yokohama-status').textContent = yokohamaNext.isNextDay ? '（翌日）' : '';
+            } else {
+                document.getElementById('yokohama-time').textContent = '運行終了';
+                document.getElementById('yokohama-status').textContent = '翌日6:05まで';
+            }
+
+            // 更新時刻
+            document.getElementById('update-time').textContent = timeString;
+        }
+
+        // 初期表示
+        updateDisplay();
+
+        // 毎秒更新
+        setInterval(updateDisplay, 1000);
+    </script>
+</body>
+</html>
